@@ -12,7 +12,7 @@ setup(
     url='http://github.com/timfreund/photofuse',
     install_requires=[
         'fusepy',
-        # 'pyexiv2' (apt-get install python-pyexiv2)
+        # PIL
                 ],
     packages=['photofuse'],
     include_package_data=True,

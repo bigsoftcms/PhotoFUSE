@@ -1,9 +1,9 @@
 import mimetypes
 import os
-import pyexiv2
 import sys
 
 from optparse import OptionParser, Option
+from PIL import Image, IptcImagePlugin
 
 def validate_destination(options, args):
     if not options.destination:
@@ -25,6 +25,8 @@ def validate_source(options, args):
 def validate_tags(options, args):
     if args:
         options.tags = set(args)
+    else:
+        options.tags = None
     return True
 
 def parse_options(options=[], validators=[], usage=None):
@@ -50,6 +52,9 @@ def parse_options(options=[], validators=[], usage=None):
         
     return options, args
 
+EXIF_IMAGE_RATING = 18246
+IPTC_APPLICATION2_KEYWORDS = (2, 25)
+
 def ls(argv=sys.argv):
     (opts, args) = parse_options()
     print "Search %s" % opts.source
@@ -67,13 +72,16 @@ def ls(argv=sys.argv):
                 rating = None
                 tags = []
 
-                img = pyexiv2.ImageMetadata(full_path)
-                img.read()
+                img = Image.open(full_path)
+                exif = img._getexif()
+                iptc = IptcImagePlugin.getiptcinfo(img)
 
-                if img.keys().count('Exif.Image.Rating'):
-                    rating = img['Exif.Image.Rating'].value
-                if img.keys().count('Iptc.Application2.Keywords'):
-                    tags = img['Iptc.Application2.Keywords'].values
+                if exif.has_key(EXIF_IMAGE_RATING):
+                    rating = exif[EXIF_IMAGE_RATING]
+                if iptc and iptc.has_key(IPTC_APPLICATION2_KEYWORDS):
+                    tags = iptc[IPTC_APPLICATION2_KEYWORDS]
+                    if isinstance(tags, str):
+                        tags = [tags]
                 
                 if opts.rating and (opts.rating > rating or not rating):
                     visible = False
