@@ -3,7 +3,7 @@ import os
 import sys
 
 from optparse import OptionParser, Option
-from PIL import Image, IptcImagePlugin
+from photofuse import judge_visibility, get_image_metadata, RATING, TAGS
 
 def validate_destination(options, args):
     if not options.destination:
@@ -52,9 +52,6 @@ def parse_options(options=[], validators=[], usage=None):
         
     return options, args
 
-EXIF_IMAGE_RATING = 18246
-IPTC_APPLICATION2_KEYWORDS = (2, 25)
-
 def ls(argv=sys.argv):
     (opts, args) = parse_options()
     print "Search %s" % opts.source
@@ -68,29 +65,9 @@ def ls(argv=sys.argv):
         for name in filenames:
             full_path = os.path.join(dirpath, name)
             if mimetypes.guess_type(full_path)[0] == 'image/jpeg':
-                visible = True
-                rating = None
-                tags = []
-
-                img = Image.open(full_path)
-                exif = img._getexif()
-                iptc = IptcImagePlugin.getiptcinfo(img)
-
-                if exif.has_key(EXIF_IMAGE_RATING):
-                    rating = exif[EXIF_IMAGE_RATING]
-                if iptc and iptc.has_key(IPTC_APPLICATION2_KEYWORDS):
-                    tags = iptc[IPTC_APPLICATION2_KEYWORDS]
-                    if isinstance(tags, str):
-                        tags = [tags]
-                
-                if opts.rating and (opts.rating > rating or not rating):
-                    visible = False
-
-                if opts.tags and opts.tags.isdisjoint(set(tags)):
-                    visible = False
-                    
-                if visible:
-                    print "%s Rating(%s) Tags(%s)" % (full_path, rating, ", ".join(tags))
+                if judge_visibility(full_path, opts.rating, opts.tags):
+                    meta = get_image_metadata(full_path)
+                    print "%s Rating(%s) Tags(%s)" % (full_path, meta[RATING], ", ".join(meta[TAGS]))
 
 def photofuse(argv=sys.argv):
     options, args = parse_options([Option()], validators=[destination_validator])
