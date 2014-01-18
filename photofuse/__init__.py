@@ -1,8 +1,10 @@
 #
 import mimetypes
+import os
 from errno import *
 from fuse import Operations
 from PIL import Image, IptcImagePlugin
+from threading import Lock
 
 EXIF_IMAGE_RATING_RAW = 18246
 IPTC_APPLICATION2_KEYWORDS_RAW = (2, 25)
@@ -25,7 +27,7 @@ def get_image_metadata(path):
                 'Iptc.Application2.Keywords': []}
     image = Image.open(path)
     exif = image._getexif()
-    iptc = IptcImagePlugin.getiptcinfo(image):
+    iptc = IptcImagePlugin.getiptcinfo(image)
 
     if exif.has_key(EXIF_IMAGE_RATING_RAW):
         metadata[RATING] = exif[EXIF_IMAGE_RATING_RAW]
@@ -38,33 +40,63 @@ def get_image_metadata(path):
 
 class PhotoFilterOperations(Operations):
     def __init__(self, root, rating=None, tags=None):
-        self.root = root
+        self.rwlock = Lock()
+        self.root = os.path.realpath(root)
         self.rating = rating
         self.tags = tags
+        self.visibility_cache = {}
 
     def __call__(self, op, path, *args):
         return super(PhotoFilterOperations, self).__call__(op, self.root + path, *args)
 
+    def is_visible(self, path):
+        if not self.visibility_cache.has_key(path):
+            visible = judge_visibility(path, self.rating, self.tags)
+            self.visibility_cache[path] = visible
+        return self.visibility_cache[path]
+
     def getattr(self, path, fh=None):
-        pass
+        if not self.is_visible(path):
+            raise FuseOSError(ENOENT)
+        st = os.lstat(path)
+        return dict((key, getattr(st, key)) for key in ('st_atime', 'st_ctime',
+                                                        'st_gid', 'st_mode', 'st_mtime', 
+                                                        'st_nlink', 'st_size', 'st_uid'))
 
     def open(self, path, flags):
-        pass
+        if not self.is_visible(path):
+            raise FuseOSError(ENOENT)
+        return os.open(path, flags)
 
-    def opendir(self, path):
-        pass
+    # def opendir(self, path):
+    #     pass
 
     def read(self, path, size, offset, fh):
-        pass
+        if not self.is_visible(path):
+            raise FuseOSError(ENOENT)
+        with self.rwlock:
+            os.lseek(fh, offset, 0)
+            return os.read(fh, size)
 
     def readdir(self, path, fh):
-        pass
+        visible_files = ['.', '..']
+        for f in os.listdir(path):
+            if self.is_visible(os.sep.join([path, f])):
+                visible_files.append(f)
+        return visible_files
 
-    def readdlink(self, path):
-        pass
+    # def readdlink(self, path):
+    #     pass
 
     def statfs(self, path):
-        pass
+        if self.is_visible(path):
+            stv = os.statvfs(path)
+            return dict((key, getattr(stv, key)) for key in ('f_bavail', 'f_bfree',
+                                                             'f_blocks', 'f_bsize', 
+                                                             'f_favail', 'f_ffree', 
+                                                             'f_files', 'f_flag',
+                                                             'f_frsize', 'f_namemax'))
+        return {}
 
-    def utimens(self, path, times=None):
-        pass
+    # def utimens(self, path, times=None):
+    #     pass

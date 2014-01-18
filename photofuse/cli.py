@@ -2,8 +2,9 @@ import mimetypes
 import os
 import sys
 
+from fuse import FUSE
 from optparse import OptionParser, Option
-from photofuse import judge_visibility, get_image_metadata, RATING, TAGS
+from photofuse import PhotoFilterOperations, judge_visibility, get_image_metadata, RATING, TAGS
 
 def validate_destination(options, args):
     if not options.destination:
@@ -70,5 +71,9 @@ def ls(argv=sys.argv):
                     print "%s Rating(%s) Tags(%s)" % (full_path, meta[RATING], ", ".join(meta[TAGS]))
 
 def photofuse(argv=sys.argv):
-    options, args = parse_options([Option()], validators=[destination_validator])
+    opts, args = parse_options([Option('-d', '--destination', dest='destination')], 
+                               validators=[validate_destination])
+    FUSE(PhotoFilterOperations(opts.source, opts.rating, opts.tags),
+         opts.destination, foreground=True)
+
 
