@@ -1,10 +1,13 @@
 #
+import logging
 import mimetypes
 import os
 from errno import *
 from fuse import Operations
 from PIL import Image, IptcImagePlugin
 from threading import Lock
+
+log = logging.getLogger('photofuse')
 
 EXIF_IMAGE_RATING_RAW = 18246
 IPTC_APPLICATION2_KEYWORDS_RAW = (2, 25)
@@ -25,11 +28,17 @@ def judge_visibility(path, rating=None, tags=None):
 def get_image_metadata(path):
     metadata = {'Exif.Image.Rating': None,
                 'Iptc.Application2.Keywords': []}
-    image = Image.open(path)
-    exif = image._getexif()
-    iptc = IptcImagePlugin.getiptcinfo(image)
 
-    if exif.has_key(EXIF_IMAGE_RATING_RAW):
+    exif, iptc = None, None
+
+    try:
+        image = Image.open(path)
+        exif = image._getexif()
+        iptc = IptcImagePlugin.getiptcinfo(image)
+    except:
+        log.error("Error loading metadata: %s" % path)
+
+    if exif and exif.has_key(EXIF_IMAGE_RATING_RAW):
         metadata[RATING] = exif[EXIF_IMAGE_RATING_RAW]
     if iptc and iptc.has_key(IPTC_APPLICATION2_KEYWORDS_RAW):
         metadata[TAGS] = iptc[IPTC_APPLICATION2_KEYWORDS_RAW]
