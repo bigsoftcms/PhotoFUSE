@@ -32,9 +32,12 @@ def get_image_metadata(path):
     exif, iptc = None, None
 
     try:
+        # fp = open(path, "rb")
         image = Image.open(path)
         exif = image._getexif()
         iptc = IptcImagePlugin.getiptcinfo(image)
+        image = None
+        # fp.close()
     except:
         log.error("Error loading metadata: %s" % path)
 
@@ -96,6 +99,9 @@ class PhotoFilterOperations(Operations):
 
     # def readdlink(self, path):
     #     pass
+
+    def release(self, path, fh):
+        return os.close(fh)
 
     def statfs(self, path):
         if self.is_visible(path):
