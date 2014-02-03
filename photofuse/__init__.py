@@ -3,7 +3,7 @@ import logging
 import mimetypes
 import os
 from errno import *
-from fuse import Operations
+from fuse import FuseOSError, LoggingMixIn, Operations
 from PIL import Image, IptcImagePlugin
 from threading import Lock
 
@@ -32,12 +32,10 @@ def get_image_metadata(path):
     exif, iptc = None, None
 
     try:
-        # fp = open(path, "rb")
         image = Image.open(path)
         exif = image._getexif()
         iptc = IptcImagePlugin.getiptcinfo(image)
         image = None
-        # fp.close()
     except:
         log.error("Error loading metadata: %s" % path)
 
@@ -50,7 +48,7 @@ def get_image_metadata(path):
     metadata[TAGS] = set(metadata[TAGS])
     return metadata
 
-class PhotoFilterOperations(Operations):
+class PhotoFilterOperations(LoggingMixIn, Operations):
     def __init__(self, root, rating=None, tags=None):
         self.rwlock = Lock()
         self.root = os.path.realpath(root)

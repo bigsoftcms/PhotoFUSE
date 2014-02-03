@@ -1,10 +1,20 @@
+import logging
 import mimetypes
 import os
 import sys
 
 from fuse import FUSE
 from optparse import OptionParser, Option
-from photofuse import PhotoFilterOperations, judge_visibility, get_image_metadata, RATING, TAGS
+from photofuse import RATING, TAGS
+from photofuse import PhotoFilterOperations, judge_visibility, get_image_metadata
+
+logging.basicConfig(level=logging.WARN)
+log = logging.getLogger("photofuse")
+
+def validate_debug(options, args):
+    if options.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+    return True
 
 def validate_destination(options, args):
     if not options.destination:
@@ -34,10 +44,13 @@ def parse_options(options=[], validators=[], usage=None):
     validators.insert(0, validate_source)
     validators.insert(0, validate_rating)
     validators.insert(0, validate_tags)
+    validators.insert(0, validate_debug)
 
     parser = OptionParser()
     parser.add_option('-s', '--source-dir', dest='source', help='Photo directory')
     parser.add_option('-r', '--rating', dest='rating', help='Exif.Image.Rating')
+    parser.add_option('--debug', action="store_true", dest='debug',
+                      default=False, help='Debug information will print to the console')
 
     for option in options:
         parser.add_option(option)
@@ -75,5 +88,3 @@ def photofuse(argv=sys.argv):
                                validators=[validate_destination])
     FUSE(PhotoFilterOperations(opts.source, opts.rating, opts.tags),
          opts.destination, foreground=True)
-
-
